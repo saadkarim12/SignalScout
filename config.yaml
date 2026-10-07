@@ -1,0 +1,59 @@
+# All thresholds live here. Change one at a time.
+account_size_usd: 1000
+data_exchange: binance
+fallback_exchange: okx
+universe_size: 30             # was 20; more coins = more signals but more noise
+min_quote_volume_usd: 10000000   # skip thinly traded coins (less than $10M traded in 24h)
+stablecoins: [USDC, FDUSD, DAI, TUSD, USDE, USDT, BUSD, USDP, PYUSD, EURI, EUR, AEUR, USD1, XUSD, RLUSD]
+wrapped_or_dupes: [WBTC, WBETH, WBNB, BETH, STETH, WEETH, CBBTC]
+cache_minutes: 10
+candles_daily: 300
+candles_4h: 500
+
+checklist:
+  sma_trend: 200
+  sma_fast: 50
+  support_tolerance_pct: 1.5
+  support_last_candles: 3
+  rsi_low: 38
+  rsi_high: 52
+  rsi_lookback: 5
+  bounce_close_top_pct: 40      # close must be in top 40% of candle range
+  bounce_volume_mult: 1.2
+  fear_below: 35
+  news_window_hours: 24
+  min_rr: 2.0
+  target_cap_rr: null           # Option A tested and made results WORSE (see reports/history). Off = original rule.
+  atr_stop_mult: 0.5
+  atr_daily_target_mult: 3.0
+  pivot_bars: 5
+  swing_lookback: 120
+  div_pivot_bars: 3
+  div_lookback: 60
+  div_recent_bars: 8
+
+verdict:
+  strong_min: 8
+  watch_min: 6
+  strong_risk_pct: 1.0
+  watch_risk_pct: 0.5
+  max_position_pct: 25
+
+trend:                          # Phase 3b: trend + momentum (daily)
+  pool_size: 60                 # coins considered (by today's volume)
+  liquid_top: 15                # at each date only the 15 most-traded coins (by past 30-day volume) are allowed
+  sma_days: 200                 # a coin / BTC must be above this average to be held
+  momentum_days: 90             # strength = price change over this many days
+  hold_n: 3                     # hold the strongest N coins, equal parts
+  rebalance_weekday: 0          # Monday: pick new strongest coins (exits can happen any day)
+  cost_per_side: 0.0015         # 0.1% fee + 0.05% slippage
+
+dca:                            # Phase 4: weekly buy reminder (pretend buys are logged; you buy manually)
+  amount_usd: 50
+  weekday: 6                    # 0=Monday ... 6=Sunday
+  hour_utc: 8
+
+practice:                       # signal practice track (pretend trades)
+  goal_trades: 20
+  pass_avg_r: 0.15              # after the goal: average result must be at least +0.15R and total R above 0
+  max_open_days: 21             # a trade still open after this long is closed at the market price ("expired")

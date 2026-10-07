@@ -1,0 +1,4 @@
+# Add high-impact news dates (UTC). Example:
+# events:
+#   - {name: "US CPI", time: "2026-10-14 12:30"}
+events: []
