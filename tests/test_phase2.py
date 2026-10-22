@@ -1,5 +1,6 @@
 import asyncio
 import pytest
+from signalscout.config import load_config
 from signalscout import journal, settings, scheduler
 from signalscout.alerts import format_alert, FOOTER
 from signalscout.charts import make_chart
@@ -48,6 +49,7 @@ def test_skip_and_no_trade_never_alert():
 
 def test_scan_and_alert_sends_once(monkeypatch):
     sent = []
+    monkeypatch.setattr(scheduler, "load_config", lambda: dict(load_config(), signal_alerts=True))
     monkeypatch.setattr(scheduler, "run_scan", lambda cfg, v: [result("A/USDT"), result("B/USDT", "SKIP")])
     monkeypatch.setattr(scheduler, "make_chart", lambda *a: b"png")
 

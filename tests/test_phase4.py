@@ -118,3 +118,13 @@ def test_tradingview_links_in_messages():
     assert "BINANCE:SOLUSDT" in t and t.endswith(FOOTER)
     assert "tradingview.com" in dca.weekly_decision("IN", 100.0, 50)["text"]
     assert "tradingview.com" in dca.weekly_decision("OUT", 100.0, 50)["text"]
+
+
+def test_four_hour_signal_alerts_can_be_switched_off(monkeypatch):
+    sent = []
+    monkeypatch.setattr(scheduler, "load_config", lambda: dict(load_config(), signal_alerts=False))
+    monkeypatch.setattr(scheduler, "run_scan", lambda cfg, v: (_ for _ in ()).throw(AssertionError("scan must not run")))
+
+    async def send(t, p):
+        sent.append(t)
+    assert asyncio.run(scheduler.scan_and_alert(send=send)) == [] and sent == []

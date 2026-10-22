@@ -25,3 +25,4 @@
 - Practice track: pretend trades from signals with automatic stop/target tracking (15-minute candles, stop first on ties, costs included), 20-trade goal with PASS / NOT PROVEN result, web tab 'Practice trades', /paper /journal /report updated, 4-hour signal alerts now also go to Slack as text.
 - Real news: Fed calendar + FRED release dates (needs free key) + CoinDesk/Cointelegraph/The Block headlines replace the empty events.yaml check; News tab; coin pages show headlines. Risk words are kept strict to avoid false alarms.
 - News: Binance official announcements added (delisting notices count 7 days). News dashboard per coin + general news. Score lines are clickable with the numbers behind them.
+- Trend portfolio strategy (BTC+ETH, 4-rule vote) from 9-year research; daily job messages only when exposure changes; Trend portfolio tab with live forward test; old checklist marked paused. docs/STRATEGY.md.

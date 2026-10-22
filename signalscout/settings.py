@@ -54,3 +54,20 @@ def set_dca_amount(usd: float):
     d["dca_amount"] = usd
     F.parent.mkdir(exist_ok=True)
     F.write_text(json.dumps(d))
+
+
+def get_tp_state() -> dict:
+    try:
+        return json.loads(F.read_text()).get("tp_state", {})
+    except Exception:
+        return {}
+
+
+def set_tp_state(d: dict):
+    try:
+        cur = json.loads(F.read_text())
+    except Exception:
+        cur = {}
+    cur["tp_state"] = d
+    F.parent.mkdir(exist_ok=True)
+    F.write_text(json.dumps(cur))

@@ -35,7 +35,14 @@ If your network blocks Binance, set `data_exchange: okx` in `config.yaml`.
 | 12 | Settings | **Settings** tab, change account size, save | Saved message. Letters or negative numbers rejected |
 | 13 | Market mode | **Market mode** tab | IN or OUT with Bitcoin versus its 200-day average |
 | 14 | Safety check | **Safety check** tab | "Everything is working correctly" |
-| 15 | Language | Read every page | Plain English, no unexplained jargon. Footer text "Signal, not advice. You decide. Risk max 1%." on alerts |
+| 15 | Trend portfolio | **Trend portfolio** tab (the main strategy) | Per coin (BTC, ETH): exposure 0 to 100%, four rules each saying IN or OUT with the real numbers, dollar amounts match **Settings**, chart loads, history table and year-by-year table show, limits box is visible |
+| 16 | Trend portfolio rules | Compare one rule on TradingView (BTCUSDT 1D, SMA 50 and 200) | Same side of the average as the page (close of the last finished daily candle) |
+| 17 | Alerts switched off | Check Slack/Telegram over a day | No 4-hour signal messages (`signal_alerts: false`). Messages only on trend exposure change, market mode flip, weekly buy day, price alert, finished practice trade |
+| 18 | Language | Read every page | Plain English, no unexplained jargon. Footer text "Signal, not advice. You decide. Risk max 1%." on alerts |
+
+## 2b. Strategy audit questions (for a quant-minded tester)
+`docs/STRATEGY.md` explains the strategy and its limits. Please try to break it: look-ahead bias, survivorship bias, cost assumptions,
+the train/test split, and whether the numbers can be reproduced with `python -m signalscout.research`.
 
 ## 3. Things that must never happen
 - Any button that buys or sells for real, or asks for exchange keys or passwords.

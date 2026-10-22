@@ -16,6 +16,7 @@ from .data import make_exchange
 from . import dca as dcamod
 from .notify import deliver
 from . import pricealerts
+from . import trendportfolio as tpmod
 
 load_dotenv(ROOT / ".env")
 
@@ -27,6 +28,8 @@ def pick_new(results):
 
 async def scan_and_alert(bot=None, chat_id=None, send=None):
     cfg = dict(load_config(), account_size_usd=settings.get_account())
+    if not cfg.get("signal_alerts", True):
+        return []                                   # switched off in config.yaml
     res = await asyncio.to_thread(run_scan, cfg, False)
     new = pick_new(res)
     for r in new:
@@ -53,7 +56,7 @@ async def practice_job(bot=None, chat_id=None, send=None, ex=None):
 
 async def main():
     bot, chat = Bot(os.environ["TELEGRAM_BOT_TOKEN"]), int(os.environ["TELEGRAM_CHAT_ID"])
-    sch = AsyncIOScheduler(timezone="UTC")
+    sch = AsyncIOScheduler(timezone="UTC", job_defaults={"misfire_grace_time": 6 * 3600, "coalesce": True})
     sch.add_job(scan_and_alert, "cron", hour="0,4,8,12,16,20", minute=5, args=[bot, chat])
     sch.add_job(check_mode_change, "cron", hour=0, minute=10, args=[bot, chat])
     sch.add_job(price_alert_job, "interval", minutes=5, args=[bot, chat])
@@ -123,3 +126,36 @@ async def price_alert_job(bot=None, chat_id=None, send=None, ex=None):
     for h in hits:
         await deliver(pricealerts.message(h), bot, chat_id, send)
     return hits
+
+
+def load_tp_data(ex, cfg):
+    import pandas as pd
+    from .data import fetch_history
+    t = cfg["trend_portfolio"]
+    data = {}
+    for sym in t["coins"]:
+        d = fetch_history(ex, sym, "1d", t["history_years"])
+        d.index = pd.to_datetime(d["ts"], unit="ms")
+        data[sym] = d
+    return data
+
+
+async def trend_portfolio_job(bot=None, chat_id=None, send=None, ex=None, data=None):
+    """Once a day after the daily candle closes: message only when a coin's exposure changes."""
+    cfg = load_config()
+    if data is None:
+        ex = ex or make_exchange(cfg["data_exchange"])
+        data = await asyncio.to_thread(load_tp_data, ex, cfg)
+    st = tpmod.live_status(data)
+    old = settings.get_tp_state()
+    new = {s: v["exposure"] for s, v in st.items()}
+    settings.set_tp_state(new)
+    slice_usd = settings.get_account() / max(len(st), 1)
+    sent = []
+    for sym, v in st.items():
+        if sym in old and abs(old[sym] - v["exposure"]) > 1e-9:
+            v = dict(v, prev_exposure=old[sym])
+            text = tpmod.format_change(sym, v, slice_usd)
+            await deliver(text, bot, chat_id, send)
+            sent.append(sym)
+    return sent

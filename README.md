@@ -30,3 +30,7 @@ Settings live in `config.yaml`. Add big news dates to `events.yaml`.
 
 ## For testers
 See `docs/QA_GUIDE.md` for setup and a step-by-step test table. Automatic tests: `make test`.
+
+## The strategy
+The main strategy is the **Trend portfolio** (BTC + ETH, four trend rules, daily). Read `docs/STRATEGY.md` for the research behind it and its limits.
+The older 10-point dip-buying checklist failed its tests and is kept for learning only.

@@ -4,6 +4,7 @@ Run:  make web      then open  http://127.0.0.1:8501
 It only runs on YOUR computer (127.0.0.1) - nobody else can reach it.
 """
 import html
+import pandas as pd
 import subprocess
 import sys
 import threading
@@ -50,7 +51,7 @@ WORDS = """
 def page(title, body):
     return (f"<!doctype html><meta charset=utf-8><title>{title}</title><style>{CSS}</style>"
             "<h1>SignalScout</h1><p class=sub>Your trading helper. It only looks at prices. It never buys or sells for you.</p>"
-            "<nav><a href='/'>Market check</a><a href='/news'>News</a><a href='/settings'>Settings</a><a href='/practice'>Practice trades</a><a href='/tutorial'>Tutorial</a><a href='/alerts'>Price alerts</a><a href='/weekly'>Weekly buys</a><a href='/mode'>Market mode</a><a href='/backtest'>Backtest</a><a href='/alert'>Alert preview</a><a href='/tests'>Safety check</a></nav>" + body)
+            "<nav><a href='/portfolio'><b>Trend portfolio</b></a><a href='/'>Market check</a><a href='/news'>News</a><a href='/settings'>Settings</a><a href='/practice'>Practice trades</a><a href='/tutorial'>Tutorial</a><a href='/alerts'>Price alerts</a><a href='/weekly'>Weekly buys</a><a href='/mode'>Market mode</a><a href='/backtest'>Backtest</a><a href='/alert'>Alert preview</a><a href='/tests'>Safety check</a></nav>" + body)
 
 
 def fmt(x):
@@ -341,6 +342,9 @@ def practice_page(msg=""):
                     f"{k}: {v['n']} finished, {v['wins']} won, total {v['total_r']:+.1f}R"
                     for k, v in practice.by_suggestion().items()) + "</small>" if practice.closed_trades() else "")
                 + "</div>"
+                "<div class=box style='background:#fff4c9'><b>Status: paused as the main strategy.</b> The first 9 practice trades "
+                "all hit their stop (-11R), and the 3-year backtest was also negative. The strategy we now follow is the "
+                "<a href='/portfolio'>Trend portfolio</a>. You can keep logging here for learning, but do not trade this method with real money.</div>"
                 "<div class=box><b>How this works in 4 steps</b><ol>"
                 "<li>Press <b>Check the market now</b>. Coins marked STRONG or WATCH are signals.</li>"
                 "<li>Click <b>Log pretend buy</b> on a signal. It saves the buy price, the stop and the target.</li>"
@@ -440,6 +444,75 @@ def settings_page(msg=""):
                 "more than 25% of it. Trades already logged keep the size they were logged with.</div>")
 
 
+_TP = {"t": 0, "data": None, "bt": None}
+
+
+def _tp_data():
+    import time as _t
+    from .scheduler import load_tp_data
+    from .data import make_exchange
+    from . import trendportfolio as tpm
+    if _TP["data"] is None or _t.time() - _TP["t"] > 1800:
+        cfg = load_config()
+        _TP["data"] = load_tp_data(make_exchange(cfg["data_exchange"]), cfg)
+        _TP["bt"] = tpm.backtest_summary(_TP["data"])
+        _TP["t"] = _t.time()
+    return _TP["data"], _TP["bt"]
+
+
+def portfolio_page():
+    from . import trendportfolio as tp
+    cfg = load_config()
+    t = cfg["trend_portfolio"]
+    data, bt = _tp_data()
+    st = tp.live_status(data)
+    acct = settings.get_account()
+    slice_usd = acct / len(st)
+    cards = ""
+    for sym, v in st.items():
+        base = sym.split("/")[0]
+        rows = "".join(f"<tr class={'STRONG' if ok else 'NO_TRADE'}><td>{r}<td>{'IN' if ok else 'OUT'}<td style='text-align:left'>{html.escape(v['details'][r])}"
+                       for r, ok in v["votes"].items())
+        change = "" if abs(v["exposure"] - v["prev_exposure"]) < 1e-9 else f" <b>(changed from {v['prev_exposure'] * 100:.0f}%)</b>"
+        cards += (f"<div class=box><b style='font-size:18px'>{base}: hold {v['exposure'] * 100:.0f}% of its slice</b>{change}<br>"
+                  f"Price {fmt(v['price'])} at the close of {v['date']:%Y-%m-%d}. Slice ${slice_usd:,.0f} -> about "
+                  f"<b>${slice_usd * v['exposure']:,.0f} invested</b>, ${slice_usd * (1 - v['exposure']):,.0f} in cash."
+                  f"<table><tr><th>Rule<th>Says<th style='text-align:left'>Numbers{rows}</table></div>")
+    se, he = tp.paper_curve(data, t["start_date"])
+    live = ""
+    if len(se) >= 2:
+        live = (f"<p>Pretend ${acct:,.0f} since {t['start_date']}: <b>strategy ${acct * se.iloc[-1]:,.0f}</b> versus "
+                f"buy-and-hold ${acct * he.iloc[-1]:,.0f} ({len(se)} days).</p>")
+    else:
+        live = f"<p>The forward test starts on {t['start_date']}. Results will appear here day by day.</p>"
+    a, b, c, d = bt["strategy_is"], bt["strategy_oos"], bt["hold_is"], bt["hold_oos"]
+    row = lambda n, x: f"<tr><td>{n}<td>{x['ret'] * 100:+,.0f}%<td>{x['dd'] * 100:.0f}%<td>{x['sharpe']:.2f}"
+    yrs = "".join(f"<tr><td>{y}<td>{s_ * 100:+.0f}%<td>{h_ * 100:+.0f}%" for y, (s_, h_) in bt["years"].items())
+    return page("Trend portfolio", "<h2>Trend portfolio: the strategy that survived the tests</h2>"
+                "<div class=box><b>The idea in one paragraph:</b> Hold Bitcoin and Ethereum only while their trends are up, and step "
+                "out in downtrends. Four simple rules vote every day. The more rules say IN, the more of that coin's slice you hold; "
+                "the rest stays cash. You check once a day, and the app messages you when something changes. "
+                "It does not try to buy the dip or pick the exact bottom.</div>"
+                f"<h3>Today</h3>{cards}"
+                "<h3>Pretend test going forward (live)</h3>" + live
+                + "<img src='/portfolio.png' width=820>"
+                "<h3>What 9 years of history showed (BTC + ETH, fees included)</h3>"
+                "<table><tr><th>Period<th>Total return<th>Worst drop<th>Sharpe"
+                + row("2017-2021 trend strategy", a) + row("2017-2021 buy and hold", c)
+                + row("2022-now trend strategy (held out)", b) + row("2022-now buy and hold", d) + "</table>"
+                "<h3>Year by year</h3><table><tr><th>Year<th>Strategy<th>Buy and hold" + yrs + "</table>"
+                "<div class=box><b>Please read the limits:</b><ul>"
+                "<li>It still loses money in bad years (about -20% in 2018 and 2022). It cuts the crashes roughly in half, it does not avoid them.</li>"
+                "<li>In strong bull years it earns LESS than holding (for example 2020 and 2021). That is the price of the protection.</li>"
+                "<li>Only BTC and ETH, survivors that went up a lot. The future may be different. XRP and ADA did badly with the same rules.</li>"
+                "<li>I chose the four-rule vote after seeing single-rule results, so the held-out test is not perfectly clean. "
+                "The forward test above is the clean one.</li>"
+                "<li>An independent audit reproduced the numbers and found no look-ahead bug. Honest long-run expectation: about 15% to 30% a year, "
+                "worst drops of 25% to 45%, and it can sit under water for up to about 2 years. 1 in 5 twelve-month periods lost money.</li>"
+                "<li>Fees and slippage are included. Taxes, exchange problems and your own emotions are not.</li></ul>"
+                "Signal, not advice. You decide. Only money you can afford to lose.</div>")
+
+
 def tests():
     p = subprocess.run([sys.executable, "-m", "pytest", "-q"], cwd=ROOT, capture_output=True, text=True)
     verdict = "<h2 class=ok>Everything is working correctly</h2>" if p.returncode == 0 else "<h2 class=no>Something is wrong - tell Claude</h2>"
@@ -458,6 +531,30 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == "/":
             self._send(home())
+        elif path == "/portfolio":
+            self._send(portfolio_page())
+        elif path == "/portfolio.png":
+            import io
+            import matplotlib
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
+            from . import trendportfolio as tp
+            data, bt = _tp_data()
+            fig, ax = plt.subplots(figsize=(9, 4))
+            ax.plot(bt["se"].index, bt["se"] * 1000, label="Trend portfolio")
+            ax.plot(bt["he"].index, bt["he"] * 1000, label="Buy and hold", alpha=0.7)
+            ax.axvline(pd.Timestamp("2022-01-01"), color="grey", ls="--")
+            ax.set_yscale("log")
+            ax.set_title("$1,000 from 2017 (log scale). Dashed line = start of the held-out test")
+            ax.legend()
+            fig.tight_layout()
+            buf = io.BytesIO()
+            fig.savefig(buf, format="png", dpi=100)
+            plt.close(fig)
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.end_headers()
+            self.wfile.write(buf.getvalue())
         elif path == "/settings":
             self._send(settings_page())
         elif path == "/news":

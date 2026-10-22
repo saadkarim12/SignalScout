@@ -1,4 +1,5 @@
 # All thresholds live here. Change one at a time.
+signal_alerts: false            # 4-hour dip-signal messages are OFF (the method failed testing). true = send them again
 account_size_usd: 1000
 data_exchange: binance
 fallback_exchange: okx
@@ -57,3 +58,8 @@ practice:                       # signal practice track (pretend trades)
   goal_trades: 20
   pass_avg_r: 0.15              # after the goal: average result must be at least +0.15R and total R above 0
   max_open_days: 21             # a trade still open after this long is closed at the market price ("expired")
+
+trend_portfolio:                # the strategy that survived 9 years of testing (see docs/STRATEGY.md)
+  coins: [BTC/USDT, ETH/USDT]   # BTC+ETH only. XRP/ADA were poor; BNB is optional (exchange-token risk)
+  history_years: 9.5
+  start_date: "2026-10-11"      # forward paper test starts here
