@@ -2,6 +2,15 @@
 
 Paper trading = pretend trading. No real money moves. SignalScout never buys or sells for you.
 
+## 0. Your daily routine now (2 minutes) - the Trend portfolio paper test
+1. About 09:00 UAE time Slack sends "Daily paper check" with today's pretend positions (it stays quiet if you already checked in).
+2. Open **http://127.0.0.1:8501/portfolio**. Read each coin: how much is invested, which rules say IN or OUT.
+3. Open **Paper results**. Press **I checked today**. Look at the QA table: it should say all passed.
+4. Nothing else. The strategy changes position only a few times a year, so on most days nothing changes. That is normal.
+5. When Slack says a coin's position CHANGED, that is the "paper trade": note the new percentage in your notebook.
+
+**When can real money start?** Only when every line on the Paper results page has a tick (90 days, QA passing, your check-ins, drawdown, position changes seen). Then only a TINY test. These rules were fixed in advance and are in `config.yaml` under `go_live`.
+
 ## 1. Start the app (nothing to do, 1 minute to check)
 SignalScout now runs by itself in the background. It starts when you log in to your Mac and restarts if it crashes.
 1. Open your browser at **http://127.0.0.1:8501** (bookmark it).

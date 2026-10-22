@@ -20,6 +20,9 @@ def _conn():
             c.execute(f"ALTER TABLE trades ADD COLUMN {col} {typ}")
         except sqlite3.OperationalError:
             pass                                           # column already there
+    c.execute("CREATE TABLE IF NOT EXISTS tp_ledger(date TEXT PRIMARY KEY, strat REAL, hold REAL, exposures TEXT)")
+    c.execute("CREATE TABLE IF NOT EXISTS qa_log(date TEXT PRIMARY KEY, ok INTEGER, details TEXT)")
+    c.execute("CREATE TABLE IF NOT EXISTS checkins(date TEXT PRIMARY KEY, note TEXT, ts REAL)")
     c.execute("""CREATE TABLE IF NOT EXISTS price_alerts(id INTEGER PRIMARY KEY, symbol TEXT, direction TEXT,
                  level REAL, created REAL, triggered REAL, price_at_trigger REAL)""")
     return c

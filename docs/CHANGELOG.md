@@ -26,3 +26,4 @@
 - Real news: Fed calendar + FRED release dates (needs free key) + CoinDesk/Cointelegraph/The Block headlines replace the empty events.yaml check; News tab; coin pages show headlines. Risk words are kept strict to avoid false alarms.
 - News: Binance official announcements added (delisting notices count 7 days). News dashboard per coin + general news. Score lines are clickable with the numbers behind them.
 - Trend portfolio strategy (BTC+ETH, 4-rule vote) from 9-year research; daily job messages only when exposure changes; Trend portfolio tab with live forward test; old checklist marked paused. docs/STRATEGY.md.
+- Paper results: daily paper run (ledger), independent second-calculation QA, cross-exchange price check, daily check-in, fixed go-live rules (config go_live), daily nudge 09:00 UAE, QA warning only on failure.

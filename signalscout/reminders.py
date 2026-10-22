@@ -4,7 +4,7 @@ from . import net  # noqa: F401
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from .config import load_config
 from .notify import slack_url, send_slack
-from .scheduler import weekly_reminder, check_mode_change, price_alert_job, practice_job, scan_and_alert, trend_portfolio_job
+from .scheduler import weekly_reminder, check_mode_change, price_alert_job, practice_job, scan_and_alert, trend_portfolio_job, daily_paper_job, daily_nudge
 
 
 async def main():
@@ -14,6 +14,8 @@ async def main():
     sch = AsyncIOScheduler(timezone="UTC", job_defaults={"misfire_grace_time": 6 * 3600, "coalesce": True})
     sch.add_job(check_mode_change, "cron", hour=0, minute=10)
     sch.add_job(trend_portfolio_job, "cron", hour=0, minute=12)
+    sch.add_job(daily_paper_job, "cron", hour=0, minute=20)
+    sch.add_job(daily_nudge, "cron", hour=5, minute=0)
     sch.add_job(price_alert_job, "interval", minutes=5)
     sch.add_job(practice_job, "interval", minutes=5)
     sch.add_job(scan_and_alert, "cron", hour="0,4,8,12,16,20", minute=5)

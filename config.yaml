@@ -3,6 +3,7 @@ signal_alerts: false            # 4-hour dip-signal messages are OFF (the method
 account_size_usd: 1000
 data_exchange: binance
 fallback_exchange: okx
+qa_exchange: kraken             # a second, independent exchange used only to cross-check prices (okx is not reachable here)
 universe_size: 30             # was 20; more coins = more signals but more noise
 min_quote_volume_usd: 10000000   # skip thinly traded coins (less than $10M traded in 24h)
 stablecoins: [USDC, FDUSD, DAI, TUSD, USDE, USDT, BUSD, USDP, PYUSD, EURI, EUR, AEUR, USD1, XUSD, RLUSD]
@@ -63,3 +64,11 @@ trend_portfolio:                # the strategy that survived 9 years of testing 
   coins: [BTC/USDT, ETH/USDT]   # BTC+ETH only. XRP/ADA were poor; BNB is optional (exchange-token risk)
   history_years: 9.5
   start_date: "2026-10-11"      # forward paper test starts here
+
+go_live:                         # fixed in advance. ALL must be true before even a tiny real test
+  min_days: 90                   # forward paper test length
+  min_qa_pass_pct: 95            # share of days the independent QA checks passed
+  min_checkin_pct: 80            # share of days YOU did the daily check-in
+  max_paper_drawdown_pct: 15     # paper account must not have dropped more than this from its peak (or worse than buy-and-hold)
+  min_exposure_changes: 2        # at least this many real position changes were seen, so the mechanics are proven
+  min_equity_pct: 90             # paper account must be above 90% of its start value

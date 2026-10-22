@@ -8,7 +8,7 @@ import pandas as pd
 import subprocess
 import sys
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
@@ -51,7 +51,7 @@ WORDS = """
 def page(title, body):
     return (f"<!doctype html><meta charset=utf-8><title>{title}</title><style>{CSS}</style>"
             "<h1>SignalScout</h1><p class=sub>Your trading helper. It only looks at prices. It never buys or sells for you.</p>"
-            "<nav><a href='/portfolio'><b>Trend portfolio</b></a><a href='/'>Market check</a><a href='/news'>News</a><a href='/settings'>Settings</a><a href='/practice'>Practice trades</a><a href='/tutorial'>Tutorial</a><a href='/alerts'>Price alerts</a><a href='/weekly'>Weekly buys</a><a href='/mode'>Market mode</a><a href='/backtest'>Backtest</a><a href='/alert'>Alert preview</a><a href='/tests'>Safety check</a></nav>" + body)
+            "<nav><a href='/portfolio'><b>Trend portfolio</b></a><a href='/paperlab'><b>Paper results</b></a><a href='/'>Market check</a><a href='/news'>News</a><a href='/settings'>Settings</a><a href='/practice'>Practice trades</a><a href='/tutorial'>Tutorial</a><a href='/alerts'>Price alerts</a><a href='/weekly'>Weekly buys</a><a href='/mode'>Market mode</a><a href='/backtest'>Backtest</a><a href='/alert'>Alert preview</a><a href='/tests'>Safety check</a></nav>" + body)
 
 
 def fmt(x):
@@ -513,6 +513,49 @@ def portfolio_page():
                 "Signal, not advice. You decide. Only money you can afford to lose.</div>")
 
 
+def paperlab_page(msg=""):
+    from . import paperqa
+    cfg = load_config()
+    data, bt = _tp_data()
+    paperqa.record_ledger(data, cfg["trend_portfolio"]["start_date"])
+    led, acct = paperqa.ledger(), settings.get_account()
+    gl = paperqa.go_live(cfg)
+    crit = "".join(f"<tr class={'STRONG' if ok else 'NO_TRADE'}><td>{'✔' if ok else '✘'} {html.escape(n)}<td style='text-align:left'>{html.escape(d)}" for n, ok, d in gl["rows"])
+    banner = ("<div style='background:#d7f5dd;border-radius:10px;padding:12px 16px'><b style='font-size:20px'>All checks pass.</b> "
+              "The next step is a TINY real test (an amount you can lose completely), never a big one. Talk to Claude first.</div>" if gl["ready"] else
+              "<div style='background:#fff4c9;border-radius:10px;padding:12px 16px'><b style='font-size:20px'>Keep practising.</b> "
+              "Real money only when every line below is a tick. These rules were fixed before the test started.</div>")
+    ci = paperqa.checkins()
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    done = any(d == today for d, _ in ci)
+    checkin_box = ("<div class=box><b>Daily check-in</b><br>" + (f"You already checked in today ({today}). Well done." if done else
+                   "<form action=/paperlab/checkin method=post>Open the Trend portfolio page, read today's positions, then press: "
+                   "<input name=note placeholder='optional note' size=30> <button>I checked today</button></form>")
+                   + f"<br><small>{len(ci)} check-ins so far. Last: {', '.join(d for d, _ in ci[:5]) or 'none'}</small></div>")
+    qa = paperqa.qa_rows(14)
+    qrows = "".join(f"<tr class={'STRONG' if r['ok'] else 'NO_TRADE'}><td>{r['date']}<td>{'all passed' if r['ok'] else 'PROBLEM'}"
+                    f"<td style='text-align:left'>{html.escape('; '.join(c['name'] for c in r['checks'] if c['ok'] is False) or str(len(r['checks'])) + ' checks')}" for r in qa)
+    latest = ""
+    if qa:
+        latest = "<details><summary>Today's QA checks in detail</summary><ul>" + "".join(
+            f"<li class={'ok' if c['ok'] else 'no' if c['ok'] is False else 'info'}>{'✔' if c['ok'] else '✘' if c['ok'] is False else 'ℹ'} "
+            f"{html.escape(c['name'])} - {html.escape(c['detail'])}</li>" for c in qa[0]["checks"]) + "</ul></details>"
+    lrows = "".join(f"<tr><td>{r['date']}<td>{', '.join(f'{k} {v * 100:.0f}%' for k, v in r['exposures'].items() if v == v)}"
+                    f"<td>${acct * r['strat']:,.0f}<td>${acct * r['hold']:,.0f}" for r in reversed(led[-14:]))
+    note = f"<div class=box>{html.escape(msg)}</div>" if msg else ""
+    return page("Paper results", f"<h2>Paper results and the go-live checklist</h2>{note}{banner}"
+                f"<table><tr><th>Rule<th style='text-align:left'>Where we are{crit}</table>{checkin_box}"
+                "<h3>Pretend account since the start</h3><img src='/paperlab.png' width=820>"
+                f"<p>Starting from ${acct:,.0f}. A 'paper trade' here means the daily recorded position: the strategy changes position only a few times a year, "
+                "so most days the position is unchanged. That is how it is designed.</p>"
+                f"<table><tr><th>Day<th>Positions<th>Strategy account<th>Buy-and-hold account{lrows or '<tr><td colspan=4>Starts on ' + cfg['trend_portfolio']['start_date'] + '</td></tr>'}</table>"
+                "<h3>Independent QA (a second, separately written calculation checks the first)</h3>"
+                "<form action=/paperlab/qa method=post style='display:inline'><button>Run the QA now</button></form>"
+                f"<table><tr><th>Day<th>Result<th style='text-align:left'>Details{qrows or '<tr><td colspan=3>No QA run yet. Press the button.</td></tr>'}</table>{latest}"
+                "<div class=box><b>Be honest with yourself:</b> 90 days cannot prove an edge. It can prove the machinery works, that the numbers are right, "
+                "and that you can follow the routine without breaking the rules. That is what these rules test. Even after a pass, start tiny.</div>")
+
+
 def tests():
     p = subprocess.run([sys.executable, "-m", "pytest", "-q"], cwd=ROOT, capture_output=True, text=True)
     verdict = "<h2 class=ok>Everything is working correctly</h2>" if p.returncode == 0 else "<h2 class=no>Something is wrong - tell Claude</h2>"
@@ -531,6 +574,33 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == "/":
             self._send(home())
+        elif path == "/paperlab":
+            self._send(paperlab_page())
+        elif path == "/paperlab.png":
+            import io
+            import matplotlib
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
+            from . import paperqa
+            led = paperqa.ledger()
+            fig, ax = plt.subplots(figsize=(9, 3.5))
+            if len(led) >= 2:
+                x = pd.to_datetime([r["date"] for r in led])
+                ax.plot(x, [r["strat"] * 100 for r in led], label="Trend strategy")
+                ax.plot(x, [r["hold"] * 100 for r in led], label="Buy and hold", alpha=0.7)
+                ax.axhline(100, color="black", lw=0.5)
+                ax.legend()
+            else:
+                ax.text(0.5, 0.5, "The line appears after the second day", ha="center", transform=ax.transAxes)
+            ax.set_title("Pretend account, start = 100")
+            fig.tight_layout()
+            buf = io.BytesIO()
+            fig.savefig(buf, format="png", dpi=100)
+            plt.close(fig)
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.end_headers()
+            self.wfile.write(buf.getvalue())
         elif path == "/portfolio":
             self._send(portfolio_page())
         elif path == "/portfolio.png":
@@ -604,6 +674,24 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        if path == "/paperlab/checkin":
+            from urllib.parse import parse_qs
+            from . import paperqa
+            n = int(self.headers.get("Content-Length") or 0)
+            note = parse_qs(self.rfile.read(min(n, 1000)).decode()).get("note", [""])[0]
+            return self._send(paperlab_page("Check-in saved. See you tomorrow." if paperqa.checkin(note) else "You already checked in today."))
+        if path == "/paperlab/qa":
+            from . import paperqa
+            from . import news as newsmod
+            from .data import make_exchange
+            from .scheduler import _other_prices
+            cfg = load_config()
+            data, _ = _tp_data()
+            ex = make_exchange(cfg["data_exchange"])
+            paperqa.record_ledger(data, cfg["trend_portfolio"]["start_date"])
+            ok = paperqa.store_qa(datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                                  paperqa.qa_checks(data, newsmod.get_news(), _other_prices(ex, list(data))))
+            return self._send(paperlab_page("QA finished: all checks passed." if ok else "QA found a problem. Details below."))
         if path == "/settings/save":
             from urllib.parse import parse_qs
             n = int(self.headers.get("Content-Length") or 0)

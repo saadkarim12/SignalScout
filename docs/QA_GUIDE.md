@@ -38,7 +38,9 @@ If your network blocks Binance, set `data_exchange: okx` in `config.yaml`.
 | 15 | Trend portfolio | **Trend portfolio** tab (the main strategy) | Per coin (BTC, ETH): exposure 0 to 100%, four rules each saying IN or OUT with the real numbers, dollar amounts match **Settings**, chart loads, history table and year-by-year table show, limits box is visible |
 | 16 | Trend portfolio rules | Compare one rule on TradingView (BTCUSDT 1D, SMA 50 and 200) | Same side of the average as the page (close of the last finished daily candle) |
 | 17 | Alerts switched off | Check Slack/Telegram over a day | No 4-hour signal messages (`signal_alerts: false`). Messages only on trend exposure change, market mode flip, weekly buy day, price alert, finished practice trade |
-| 18 | Language | Read every page | Plain English, no unexplained jargon. Footer text "Signal, not advice. You decide. Risk max 1%." on alerts |
+| 18 | Paper results | **Paper results** tab | Go-live checklist with ticks and crosses, today's QA table (all passed or the failing check named), daily record, chart. Press **Run the QA now**: result appears. Press **I checked today**: a second press the same day says already checked in |
+| 19 | Independent calculation | `python -c "from signalscout import paperqa"` then compare `paperqa.indep_exposure(closes)` with the app on any coin | Same exposure (it is a separately written calculation) |
+| 20 | Language | Read every page | Plain English, no unexplained jargon. Footer text "Signal, not advice. You decide. Risk max 1%." on alerts |
 
 ## 2b. Strategy audit questions (for a quant-minded tester)
 `docs/STRATEGY.md` explains the strategy and its limits. Please try to break it: look-ahead bias, survivorship bias, cost assumptions,

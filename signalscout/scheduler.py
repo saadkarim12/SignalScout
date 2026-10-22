@@ -2,6 +2,7 @@
 import asyncio
 from . import net  # noqa: F401  (IPv4 only)
 import os
+from datetime import datetime, timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
 from telegram import Bot
@@ -17,6 +18,7 @@ from . import dca as dcamod
 from .notify import deliver
 from . import pricealerts
 from . import trendportfolio as tpmod
+from . import paperqa
 
 load_dotenv(ROOT / ".env")
 
@@ -159,3 +161,52 @@ async def trend_portfolio_job(bot=None, chat_id=None, send=None, ex=None, data=N
             await deliver(text, bot, chat_id, send)
             sent.append(sym)
     return sent
+
+
+def _other_prices(ex, coins):
+    """Binance vs a second exchange live price for a sanity check (None if the second exchange cannot be reached)."""
+    try:
+        okx = make_exchange(load_config().get("qa_exchange", "kraken"))
+        return {s: (float(ex.fetch_ticker(s)["last"]), float(okx.fetch_ticker(s)["last"])) for s in coins}
+    except Exception:
+        return None
+
+
+async def daily_paper_job(bot=None, chat_id=None, send=None, ex=None, data=None, news=None, other=None):
+    """After the daily candle closes: record the pretend position and value, run the independent QA, speak only on a failure."""
+    from . import news as newsmod
+    cfg = load_config()
+    if data is None:
+        ex = ex or make_exchange(cfg["data_exchange"])
+        data = await asyncio.to_thread(load_tp_data, ex, cfg)
+        other = await asyncio.to_thread(_other_prices, ex, list(data))
+        news = await asyncio.to_thread(newsmod.get_news)
+    paperqa.record_ledger(data, cfg["trend_portfolio"]["start_date"])
+    checks = paperqa.qa_checks(data, news, other)
+    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    ok = paperqa.store_qa(day, checks)
+    if not ok:
+        bad = [c for c in checks if c["ok"] is False]
+        text = ("⚠️ Daily QA found a problem with the Trend portfolio:\n" + "\n".join(f"- {c['name']}: {c['detail']}" for c in bad)
+                + "\nDo not rely on today's numbers until this is checked.\n\nSignal, not advice. You decide. Risk max 1%.")
+        await deliver(text, bot, chat_id, send)
+    return ok
+
+
+async def daily_nudge(bot=None, chat_id=None, send=None, data=None):
+    """Morning message: today's pretend position and a reminder to do the daily check-in (skipped if you already did)."""
+    cfg = load_config()
+    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if any(d == day for d, _ in paperqa.checkins()):
+        return None
+    if data is None:
+        data = await asyncio.to_thread(load_tp_data, make_exchange(cfg["data_exchange"]), cfg)
+    st = tpmod.live_status(data)
+    lines = [f"{s.split('/')[0]}: {v['exposure'] * 100:.0f}% invested ({'unchanged' if abs(v['exposure'] - v['prev_exposure']) < 1e-9 else 'CHANGED'})"
+             for s, v in st.items()]
+    led = paperqa.ledger()
+    prog = f"Day {len(led)} of {cfg['go_live']['min_days']} of the paper test." if led else "Paper test starting."
+    text = ("☀️ Daily paper check\n" + "\n".join(lines) + f"\n{prog}\nOpen http://127.0.0.1:8501/paperlab and press 'I checked today'."
+            "\n\nSignal, not advice. You decide. Risk max 1%.")
+    await deliver(text, bot, chat_id, send)
+    return text

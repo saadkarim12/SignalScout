@@ -4,7 +4,7 @@ from . import net  # noqa: F401  (IPv4 only)
 import os
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from .bot import build_app
-from .scheduler import scan_and_alert, check_mode_change, weekly_reminder, price_alert_job, practice_job, trend_portfolio_job
+from .scheduler import scan_and_alert, check_mode_change, weekly_reminder, price_alert_job, practice_job, trend_portfolio_job, daily_paper_job, daily_nudge
 from .config import load_config
 
 
@@ -18,6 +18,8 @@ async def main():
         sch.add_job(scan_and_alert, "cron", hour="0,4,8,12,16,20", minute=5, args=[app.bot, chat])
         sch.add_job(check_mode_change, "cron", hour=0, minute=10, args=[app.bot, chat])
         sch.add_job(trend_portfolio_job, "cron", hour=0, minute=12, args=[app.bot, chat])
+        sch.add_job(daily_paper_job, "cron", hour=0, minute=20, args=[app.bot, chat])
+        sch.add_job(daily_nudge, "cron", hour=5, minute=0, args=[app.bot, chat])
         sch.add_job(price_alert_job, "interval", minutes=5, args=[app.bot, chat])
         sch.add_job(practice_job, "interval", minutes=5, args=[app.bot, chat])
         d = load_config()["dca"]
